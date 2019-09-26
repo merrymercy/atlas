@@ -90,9 +90,9 @@ class IndependentOperatorsModel(TraceImitationModel, ABC):
 
     def get_op_model(self, sid: str) -> Optional[TrainableModel]:
         unpacked = unpack_sid(sid)
-        op_type, label = unpacked.op_type, unpacked.label
-        if label is not None and hasattr(self, f"{op_type}_{label}"):
-            return getattr(self, f"{op_type}_{label}")(sid)
+        op_type, uid = unpacked.op_type, unpacked.uid
+        if uid is not None and hasattr(self, f"{op_type}_{uid}"):
+            return getattr(self, f"{op_type}_{uid}")(sid)
 
         if hasattr(self, op_type):
             return getattr(self, op_type)(sid)
