@@ -1,6 +1,5 @@
 from math import sqrt, ceil
 
-
 def is_prime(n):
     if n < 4:
         return True
