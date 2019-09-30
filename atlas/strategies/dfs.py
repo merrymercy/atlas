@@ -2,9 +2,8 @@ import itertools
 from typing import Dict, Any, Callable, Collection, Optional, Iterator, Tuple
 
 from atlas.exceptions import ExceptionAsContinue
-from atlas.strategies import operator
+from atlas.operators import operator, method, OpInfo
 from atlas.strategies.strategy import IteratorBasedStrategy
-from atlas.operators import OpInfo
 
 
 class DfsStrategy(IteratorBasedStrategy):
