@@ -1,24 +1,27 @@
 import ast
+import time
 import collections
 import inspect
 import itertools
 import sys
 import textwrap
 import weakref
+import multiprocessing
 from typing import Callable, Set, Optional, Union, Dict, List, Any, Iterable, Iterator, Type, Tuple
 
 import astunparse
 
 from atlas.exceptions import ExceptionAsContinue
+from atlas.operators import OpInfo, OpInfoConstructor
 from atlas.hooks import Hook
 from atlas.models import GeneratorModel
-from atlas.operators import OpInfo, OpInfoConstructor
-from atlas.strategies import Strategy, RandStrategy, DfsStrategy, PartialReplayStrategy, FullReplayStrategy
-from atlas.strategies.strategy import IteratorBasedStrategy
 from atlas.tracing import DefaultTracer, GeneratorTrace
+from atlas.strategies import Strategy, RandStrategy, DfsStrategy, PartialReplayStrategy, FullReplayStrategy, IteratorBasedStrategy
 from atlas.utils import astutils
 from atlas.utils.genutils import register_generator, register_group, get_group_by_name
 from atlas.utils.inspection import getclosurevars_recursive
+
+from atlas.strategies.parallel_dfs import ParallelDfsStrategy, FastReplayStrategy
 
 _GEN_EXEC_ENV_VAR = "_atlas_gen_exec_env"
 _GEN_STRATEGY_VAR = "_atlas_gen_strategy"
@@ -37,6 +40,9 @@ def make_strategy(strategy: Union[str, Strategy]) -> Strategy:
 
     elif strategy == 'dfs':
         return DfsStrategy()
+
+    elif strategy == 'parallel-dfs':
+        return ParallelDfsStrategy()
 
     raise Exception(f"Unrecognized strategy - {strategy}")
 
@@ -99,7 +105,9 @@ def compile_func(gen: 'Generator', func: Callable, strategy: Strategy, with_hook
         cache = CompilationCache.WITHOUT_HOOKS[strategy.__class__]
 
     if func in cache:
-        return cache[func]
+        result = cache[func]
+        setattr(sys.modules[result.__module__], result.__qualname__, result)
+        return result
 
     cache[func] = None
 
@@ -111,16 +119,19 @@ def compile_func(gen: 'Generator', func: Callable, strategy: Strategy, with_hook
     ast.increment_lineno(f_ast, start_lineno - 1)
 
     #  Remove the ``@generator`` decorator to avoid recursive compilation
-    f_ast.decorator_list = [d for d in f_ast.decorator_list
-                            if (not isinstance(d, ast.Name) or d.id != 'generator') and
-                            (not isinstance(d, ast.Attribute) or d.attr != 'generator') and
-                            (not (isinstance(d, ast.Call) and isinstance(d.func,
-                                                                         ast.Name)) or d.func.id != 'generator')]
-
+    decorator_list = []
+    for d in f_ast.decorator_list:
+        src_code = astunparse.unparse(d)
+        if not src_code.startswith("atlas.generator") and not src_code.startswith('generator'):
+            decorator_list.append(d)
+    f_ast.decorator_list = decorator_list
+             
     #  Get all the external dependencies of this function.
     #  We rely on a modified closure function adopted from the ``inspect`` library.
     closure_vars = getclosurevars_recursive(func, f_ast)
     g = {**closure_vars.nonlocals.copy(), **closure_vars.globals.copy()}
+    g['atlas'] = sys.modules['atlas']
+
     known_ops: Set[str] = strategy.get_known_ops()
     known_methods: Set[str] = strategy.get_known_methods()
     op_info_constructor = OpInfoConstructor()
@@ -211,10 +222,15 @@ def compile_func(gen: 'Generator', func: Callable, strategy: Strategy, with_hook
     module = ast.Module()
     module.body = [f_ast]
 
+    #print(astunparse.unparse(f_ast))
+
     #  Passing ``g`` to exec allows us to execute all the new functions
     #  we assigned to every operator call in the previous AST walk
     exec(compile(module, filename=inspect.getabsfile(func), mode="exec"), g)
     result = g[func.__name__]
+    result.__module__ = 'atlas.stubs'
+    result.__qualname__ = func_name
+
     #  Restore the correct namespace so that tracebacks contain actual function names
     g[gen.name] = gen
     g[func_name] = result
@@ -231,6 +247,8 @@ def compile_func(gen: 'Generator', func: Callable, strategy: Strategy, with_hook
         else:
             g[call_id] = compiled_func
 
+    # register the new function for pickle and unpickle
+    setattr(sys.modules[result.__module__], result.__qualname__, result)
     return result
 
 
@@ -441,6 +459,19 @@ class Generator:
         ).first()
 
 
+fast_replay_func = fast_replay_args = fast_replay_kwargs = None
+
+import numpy as np
+def fast_replay(trace):
+    global fast_replay_func, fast_replay_args, fast_replay_kwargs
+    replay_stra = FastReplayStrategy(trace)
+    fast_replay_kwargs[_GEN_STRATEGY_VAR] = replay_stra
+    try:
+        #aha = fast_replay_func(*fast_replay_args, **fast_replay_kwargs)
+        return np.full((10, 10, 10), 3.14)
+    except ExceptionAsContinue:
+        return None
+
 class GeneratorExecEnvironment(Iterable):
     """
     The result of calling ``generate(...)`` on a Generator object.
@@ -462,6 +493,7 @@ class GeneratorExecEnvironment(Iterable):
         self.model = model
         self.hooks = hooks
         self.parent_gen: Generator = parent_gen
+        self.batch_size = None
 
         self._compiled_func: Optional[Callable] = None
         self._compilation_cache: Dict[Generator, Callable] = {}
@@ -516,7 +548,72 @@ class GeneratorExecEnvironment(Iterable):
             finally:
                 self.strategy.finish_run()
 
+    def batch_iter(self) -> Iterator:
+        # Do not support hook
+        combined_kwargs = {**self.kwargs, 
+                           _GEN_EXEC_ENV_VAR: self, _GEN_STRATEGY_VAR: self.strategy,
+                           _GEN_HOOK_VAR: []}
+
+        if self.tracer:
+            self.hooks.remove(self.tracer)
+            self.reset_compilation()
+
+        global fast_replay_func, fast_replay_args, fast_replay_kwargs
+        fast_replay_func = self._compiled_func
+        fast_replay_args = self.args
+        fast_replay_kwargs = combined_kwargs
+
+        pool = multiprocessing.Pool()
+
+        # main loop
+        self.strategy.init()
+        batch_trace = []
+
+        t_construct = 0
+        t_replay = 0
+        while not self.strategy.is_finished() or batch_trace:
+            tb = time.time()
+            x = 0
+            while len(batch_trace) < self.batch_size and not self.strategy.is_finished():
+                self.strategy.init_run()
+                try:
+                    self._compiled_func(*self.args, **combined_kwargs)
+                except ExceptionAsContinue:
+                    pass
+                t = self.strategy.get_trace_batch()
+                batch_trace.extend(t)
+                x = x * 0.98 + 0.02 * len(t)
+                self.strategy.finish_run()
+
+            #print(x)
+
+            te = time.time()
+            t_construct += te - tb
+
+            # replay traces
+            tb = time.time()
+            to_run, batch_trace = batch_trace[:self.batch_size], batch_trace[self.batch_size:]
+            values = [x for x in pool.map(fast_replay, to_run) if x is not None]
+            te = time.time()
+            t_replay += te - tb
+
+            if self.tracer:
+                yield zip(values, to_run)
+            else:
+                yield values
+
+        print(f"Construct: {t_construct}\t Replay: {t_replay}")
+        self.strategy.finish()
+
     def __iter__(self) -> Iterator:
+        if self.batch_size:
+            ct = 0
+            for batch in self.batch_iter():
+                for item in batch:
+                    ct += 1
+                    yield item
+            return
+
         extra_kwargs = {_GEN_EXEC_ENV_VAR: self, _GEN_STRATEGY_VAR: self.strategy, _GEN_HOOK_VAR: self.hooks}
 
         for h in self.hooks:
@@ -662,6 +759,10 @@ class GeneratorExecEnvironment(Iterable):
         self.strategy = PartialReplayStrategy(trace, self.strategy)
         return self
 
+    def with_batch(self, batch_size: int=None) -> 'GeneratorExecEnvironment':
+        self.batch_size = batch_size or 65536
+        return self
+
 
 def generator(func=None, strategy='dfs', name=None, group=None, caching=None, metadata=None) -> Generator:
     """Define a generator from a function
@@ -714,6 +815,11 @@ def generator(func=None, strategy='dfs', name=None, group=None, caching=None, me
 
     """
     def wrapper(func):
+        # rename the function for pickle
+        func.__qualname__ = func.__qualname__ + "_original"
+        func.__module = func.__module__ or 'atlas.stubs'
+        setattr(sys.modules[func.__module__], func.__qualname__, func)
+
         return Generator(func, strategy=strategy, name=name, group=group, caching=caching, metadata=metadata)
 
     if func:

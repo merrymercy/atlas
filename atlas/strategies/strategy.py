@@ -7,7 +7,7 @@ from atlas.operators import OpInfo, is_operator, is_method, get_attrs, OpResolva
     find_known_operators, find_known_methods
 
 
-class Strategy(ABC, OpResolvable):
+class Strategy(OpResolvable):
     def __init__(self):
         self.known_ops = find_known_operators(self)
         self.known_methods = find_known_methods(self)

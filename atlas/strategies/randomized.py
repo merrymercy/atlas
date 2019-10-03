@@ -1,14 +1,17 @@
 import random
 from typing import Callable, Optional, Collection, Any
 
-from atlas.operators import OpInfo
-from atlas.strategies import Strategy, operator
+from atlas.operators import OpInfo, operator
+from atlas.strategies import Strategy
 
 
 class RandStrategy(Strategy):
     def generic_call(self, domain=None, context=None, op_info: OpInfo = None, handler: Optional[Callable] = None,
                      **kwargs):
-        return handler(self, domain=domain, context=context, op_info=op_info, **kwargs)
+        try:
+            return handler(self, domain=domain, context=context, op_info=op_info, **kwargs)
+        except IndexError:  # empty domain
+            return None
 
     def is_finished(self):
         return False
