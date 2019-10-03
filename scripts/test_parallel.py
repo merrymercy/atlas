@@ -12,19 +12,8 @@ from atlas.synthesis.numpy.api import gen_repeat
 
 @atlas.generator
 def initial_extractor(name):
-#    first = Select([1, 2, 3])
-#    second = Select([first * 3 + 1, first * 3 + 2, first * 3 + 3])
-#    last = Select(["A", "B", "C"], dependency=True)
-#    return f"{first}.{second}.{last}"
-
-    first = Select(name, dependency=True)
-    if first == 'u':
-        last = Select(name)
-    else:
-        last = first
-
-    if first == 'l':
-        raise atlas.ExceptionAsContinue
+    first = Select(name)
+    last = Select(name)
 
     return f"{first}.{last}"
 
@@ -58,6 +47,8 @@ def measure_initial_extractor():
 
     res2 = parallel()
 
+    print(res2)
+
     assert res1 == res2
     print(len(res1))
     print(f"Sequential : {measure(sequential)}")
@@ -68,8 +59,8 @@ def numpy_test(inputs, output):
     val, prog = gen_repeat(inputs, output)
     inputs = inputs + [val]
     val, prog = gen_repeat(inputs, output)
-    inputs = inputs + [val]
-    val, prog = gen_repeat(inputs, output)
+#    inputs = inputs + [val]
+#    val, prog = gen_repeat(inputs, output)
 
     return val, prog
 
@@ -82,7 +73,7 @@ def sequential_numpy():
                               .with_tracing():
         ct += 1
 
-    print(ct)
+    #print(ct)
 
 
 def parallel_numpy():
@@ -94,12 +85,19 @@ def parallel_numpy():
                               .with_tracing().with_batch():
         ct += 1
 
-    print(ct)
+    #print(ct)
+
+@ray.remote
+def test_func(arg_1, arg_2):
+    None
 
 
 if __name__ == "__main__":
-    #measure_initial_extractor()
+    config = ray.init(num_cpus=24)
+    print("==================")
+    print(config)
+    print("==================")
 
-    #print(f"Sequential : {measure(sequential_numpy)}")
     print(f"Parallel   : {measure(parallel_numpy)}")
+    ray.timeline(filename='timeline.tracing')
 

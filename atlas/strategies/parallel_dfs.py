@@ -8,10 +8,15 @@ from atlas.strategies.strategy import Strategy, IteratorBasedStrategy
 
 class FastReplayStrategy(Strategy):
     def __init__(self, trace):
+        super().__init__()
         self.trace = iter(trace)
 
     def generic_call(self, *args, **kwargs):
         return next(self.trace)
+
+    @operator
+    def Select(self, *args, **kwargs):
+        pass
 
 class ParallelDfsStrategy(IteratorBasedStrategy):
     def __init__(self):

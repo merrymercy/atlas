@@ -21,3 +21,4 @@ def Product(*args, **kwargs):
 
 def Sequence(*args, **kwargs):
     raise_unrecognized('Sequence')
+

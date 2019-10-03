@@ -8,15 +8,16 @@ IS_GENERATOR_OP = "_is_generator_operator"
 IS_GENERATOR_METHOD = "_is_generator_method"
 RESOLUTION_INFO = "_resolution_INFO"
 
+OpInfo = collections.namedtuple("OpInfo", ["sid", "gen_name", "op_type", "index", "gen_group", "uid", "tags"])
 
-class OpInfo(NamedTuple):
-    sid: str
-    gen_name: str
-    op_type: str
-    index: int
-    gen_group: str = None
-    uid: Optional[str] = None
-    tags: Optional[List[str]] = None
+#class OpInfo(NamedTuple):
+#    sid: str
+#    gen_name: str
+#    op_type: str
+#    index: int
+#    gen_group: str = None
+#    uid: Optional[str] = None
+#    tags: Optional[List[str]] = None
 
 
 def operator_decorator(name: str = None,
