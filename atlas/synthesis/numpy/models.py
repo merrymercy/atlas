@@ -53,5 +53,5 @@ class NumpySelect(SelectGGNN):
     def infer(self, domain, context=None, sid='', **kwargs):
         encoding = self.encoder.get_encoder(self.sid)(domain, context, mode='inference', sid=sid)
         preds = super().infer([encoding])[0]
-        return [domain[val] for val, prob in sorted(preds, key=lambda x: -x[1])]
+        return [val for val, prob in sorted(preds, key=lambda x: -x[1])]
 

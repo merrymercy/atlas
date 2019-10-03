@@ -60,7 +60,7 @@ def get_used_functions(seqs):
     return list(used_funcs)
 
 
-def random_ndarray(max_dim=3, max_per_dim=5, dtypes=[np.float]):
+def random_ndarray(max_dim=4, max_per_dim=4, dtypes=[np.float]):
     ndim = np.random.randint(1, max_dim)
     shape = []
     for i in range(ndim):
@@ -140,9 +140,9 @@ if __name__ == "__main__":
         args.n_only = len(seqs)
 
     train_data, _ = gen_traces(seqs[:args.n_only], args.train_size_per_seq, args.seq_per_input,
-            funcs, 'randomized')
+            funcs, 'dfs')
     test_data, test_cases = gen_traces(seqs[:args.n_only], args.test_size_per_seq, args.seq_per_input,
-            funcs, 'randomized')
+            funcs, 'dfs')
 
     print(len(train_data), len(test_data))
     random.shuffle(train_data)

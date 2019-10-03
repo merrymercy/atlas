@@ -518,15 +518,12 @@ def gen_tile(inputs, output, **kwargs):
 
 @generator(group='numpy', name='repeat')
 def gen_repeat(inputs, output, **kwargs):
-    _a = Select([inp for inp in inputs if isinstance(inp, np.ndarray)])
+    #_a = Select([inp for inp in inputs if isinstance(inp, np.ndarray)])
+    _a = inputs[0]
     c = {"I0": _a, "O": output}
 
     _repeats = Select(range(MAX_REPEATS), context=c)
-
-    _axis = None
-    use_axis = Select([True, False], context=c)
-    if use_axis:
-        _axis = Select(range(_a.ndim), context=c)
+    _axis = Select([None] + list(range(_a.ndim)), context=c)
 
     return np.repeat(_a, _repeats, axis=_axis), {
         'a': _a, 'repeats': _repeats, 'axis': _axis

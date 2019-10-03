@@ -78,11 +78,11 @@ class NumpyGraphEncoder:
 
     @staticmethod
     def label_to_base_feature(label):
-        if "I" in label:
+        if label.startswith("I"):
             return [NodeFeature.INPUT.value]
-        elif "O" in label:
+        elif label.startswith("O"):
             return [NodeFeature.OUTPUT.value]
-        elif label == "domain":
+        elif label.startswith("D"):
             return [NodeFeature.DOMAIN.value]
         else:
             return []
@@ -93,12 +93,11 @@ class NumpyGraphEncoder:
                 edge_type = EdgeType.INNER_EQUALITY if x in inner_nodes else EdgeType.EQUALITY
                 self.edges.append([x, edge_type.value, src_node_id])
                 self.edges.append([src_node_id, edge_type.value, x])
-            self.value_collections[value].append(src_node_id)
+            self.value_collections[value].add(src_node_id)
         else:
-            self.value_collections[value] = [src_node_id]
+            self.value_collections[value] = set([src_node_id])
 
     def encode_ndarray(self, array, label):
-        base_id = len(self.nodes)
         base_fea = NumpyGraphEncoder.label_to_base_feature(label)
 
         # representor nodes
@@ -141,6 +140,7 @@ class NumpyGraphEncoder:
             dim_lens.append(prod)
             prod *= x
         dim_lens = list(reversed(dim_lens))
+        value_nodes_begin = len(self.nodes)
 
         inner_nodes = set()
         for i in range(np.prod(array.shape)):
@@ -152,51 +152,54 @@ class NumpyGraphEncoder:
             idx = tuple(idx)
 
             value = array[idx]
-            self.nodes.append([NodeFeature.type_to_feature(value).value])
+            self.nodes.append([NodeFeature.type_to_feature(value).value] + base_fea)
             t = len(self.nodes) - 1
 
-            # index edge
+            # index edges
             for j in range(array.ndim):
                 self.edges.append([dim_nodes[j][idx[j]], EdgeType.INDEX.value, t])
                 self.edges.append([t, EdgeType.INDEX_FOR.value, dim_nodes[j][idx[j]]])
-                self.edges.append([repre_node, EdgeType.REPRESENTOR.value, t])
-                self.edges.append([t, EdgeType.REPRESENTED.value, repre_node])
-            inner_nodes.add(t)
+
+            # representor edges
+            self.edges.append([repre_node, EdgeType.REPRESENTOR.value, t])
+            self.edges.append([t, EdgeType.REPRESENTED.value, repre_node])
 
             # adjacent edges
             for j in range(array.ndim):
                 adj_idx = list(idx)
                 adj_idx[j] += 1
                 if adj_idx[j] >= 0 and adj_idx[j] < array.shape[j]:
-                    dst = sum([adj_idx[k] * dim_lens[k] for k in range(array.ndim)])
+                    dst = sum([adj_idx[k] * dim_lens[k] for k in range(array.ndim)]) + value_nodes_begin
                     self.edges.append([dst, EdgeType.ADJ_DOWN.value, t])
                     self.edges.append([t, EdgeType.ADJ_UP.value, dst])
 
-                adj_idx[j] -= 2
-                if (adj_idx[j] >= 0 and adj_idx[j] < array.shape[j]):
-                    dst = sum([adj_idx[k] * dim_lens[k] for k in range(array.ndim)])
-                    self.edges.append([dst, EdgeType.ADJ_UP.value, t])
-                    self.edges.append([t, EdgeType.ADJ_DOWN.value, dst])
-
             # equality edge
+            inner_nodes.add(t)
             self.add_equality_edges(value, t, inner_nodes)
 
-    def encode_value(self, value, label):
-        self.nodes.append([NodeFeature.DOMAIN.value])
-        t = len(self.nodes) - 1
+        return repre_node
 
-        if value in self.value_collections:
-            for x in self.value_collections[value]:
-                self.edges.append([x, EdgeType.EQUALITY.value, t])
-                self.edges.append([t, EdgeType.EQUALITY.value, x])
-        else:
-            self.value_collections[value] = [t]
+    def encode_value(self, value, label):
+        base_fea = NumpyGraphEncoder.label_to_base_feature(label)
+
+        # representor
+        self.nodes.append([NodeFeature.REPRESENTOR.value] + base_fea)
+        repre_node = len(self.nodes) - 1
+
+        # value node
+        self.nodes.append([NodeFeature.type_to_feature(value).value] + base_fea)
+        t = len(self.nodes) - 1
+        self.edges.append([repre_node, EdgeType.REPRESENTOR.value, t])
+        self.edges.append([t, EdgeType.REPRESENTED.value, repre_node])
+        self.add_equality_edges(value, t)
+
+        return repre_node
 
     def encode(self, x, label=None):
         if isinstance(x, np.ndarray):
-            self.encode_ndarray(x, label)
+            return self.encode_ndarray(x, label)
         else:
-            self.encode_value(x, label)
+            return self.encode_value(x, label)
 
     def Select(self, domain: List[Any], context: Mapping[str, Any], choice=None,
                mode='training', **kwargs):
@@ -206,33 +209,53 @@ class NumpyGraphEncoder:
         self.nodes = []
         self.edges = []
         self.value_collections = {}
+        self.label_to_node_id = {}
 
         # create nodes
         for k, v in context.items():
-            self.encode(v, k)
-        for v in domain:
-            self.encode(v, "domain")
+            self.label_to_node_id[k] = self.encode(v, k)
+        for i, v in enumerate(domain):
+            self.label_to_node_id[f"D{i}"] = self.encode(v, f"D{i}")
 
-        ret = {"nodes": self.nodes, "edges": self.edges,
-               "domain": list(range(len(domain)))}
+        ret = {"nodes": self.nodes, "edges": remove_multiple_edges(self.edges),
+               "domain": [self.label_to_node_id[f"D{i}"] for i in range(len(domain))]}
 
         if mode == 'training':
             if isinstance(choice, np.ndarray):
                 found = False
                 for i, x in enumerate(domain):
-                    if x in choice:
-                        ret['choice'] = i
+                    if x is choice:
+                        choice_idx = i
                         found = True
                         break
                 assert found, "InternalError: choice is not listed in domain"
             else:
-                ret['choice'] = domain.index(choice)
+                choice_idx = domain.index(choice)
+
+            ret['choice'] = self.label_to_node_id[f"D{choice_idx}"]
+        else:
+            ret['mapping'] = {self.label_to_node_id[f"D{i}"]: v 
+                              for i, v in enumerate(domain)}
 
         return ret
+
+def remove_multiple_edges(edges):
+    ret = []
+    visited = set()
+    for edge in edges:
+        if (edge[0], edge[2]) in visited:
+            continue
+
+        visited.add((edge[0], edge[1]))
+        ret.append(edge)
+
+    return ret
+
 """
   {
     "nodes": [ [fea1, fea2], [fea4, fea5], ... ]
     "edges": [ [src, edge_type, dst], [src, edge_type, dst], ... ]
-    "domain": [0, 1, 2]
+    "domain": [4, 9, 12]
+    "choice": 4
   }
 """
