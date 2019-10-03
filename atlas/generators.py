@@ -30,27 +30,6 @@ _GEN_HOOK_VAR = "_atlas_gen_hooks"
 _GEN_COMPOSITION_ID = "_atlas_composition_call"
 _GEN_COMPILED_TARGET_ID = "_atlas_compiled_function"
 
-import ray
-def fast_replay_ray(fast_replay_func, fast_replay_args, fast_replay_kwargs, trace):
-    #return None
-    replay_stra = FastReplayStrategy(trace)
-    fast_replay_kwargs[_GEN_STRATEGY_VAR] = replay_stra
-    try:
-        return fast_replay_func(*fast_replay_args, **fast_replay_kwargs)
-    except ExceptionAsContinue:
-        return None
-
-
-@ray.remote
-class Executor:
-    def __init__(self, compiled_func, args, kwargs):
-        self.compiled_func = compiled_func
-        self.args = args
-        self.kwargs = kwargs
-
-    def execute(self, trace):
-        return fast_replay_ray(self.compiled_func, self.args, self.kwargs, trace)
-
 
 def make_strategy(strategy: Union[str, Strategy]) -> Strategy:
     if isinstance(strategy, Strategy):
@@ -114,6 +93,7 @@ def compile_func(gen: 'Generator', func: Callable, strategy: Strategy, with_hook
 
     Returns:
         The compiled function
+
     """
 
     if isinstance(strategy, PartialReplayStrategy):
@@ -126,7 +106,7 @@ def compile_func(gen: 'Generator', func: Callable, strategy: Strategy, with_hook
 
     if func in cache:
         result = cache[func]
-#        setattr(sys.modules[result.__module__], result.__qualname__, result)
+        setattr(sys.modules[result.__module__], result.__qualname__, result)
         return result
 
     cache[func] = None
@@ -230,12 +210,10 @@ def compile_func(gen: 'Generator', func: Callable, strategy: Strategy, with_hook
     #  Add the strategy argument to the function
     f_ast.args.kwonlyargs.append(ast.arg(arg=_GEN_HOOK_VAR, annotation=None))
     f_ast.args.kw_defaults.append(ast.NameConstant(value=None))
-
+    ast.fix_missing_locations(f_ast)
 
     #  New name so it doesn't clash with original
     func_name = f"{_GEN_COMPILED_TARGET_ID}_{len(cache)}"
-    f_ast.name = func_name
-    ast.fix_missing_locations(f_ast)
 
     g.update({k: v for k, v in ops.items()})
     g.update({k: v for k, v in handlers.items()})
@@ -244,15 +222,13 @@ def compile_func(gen: 'Generator', func: Callable, strategy: Strategy, with_hook
     module = ast.Module()
     module.body = [f_ast]
 
-    source_code = astunparse.unparse(f_ast)
+    #print(astunparse.unparse(f_ast))
 
     #  Passing ``g`` to exec allows us to execute all the new functions
     #  we assigned to every operator call in the previous AST walk
-
     exec(compile(module, filename=inspect.getabsfile(func), mode="exec"), g)
-
-    result = g[func_name]
-    result.__module__ = 'atlas.compiled_func'
+    result = g[func.__name__]
+    result.__module__ = 'atlas.stubs'
     result.__qualname__ = func_name
 
     #  Restore the correct namespace so that tracebacks contain actual function names
@@ -272,6 +248,7 @@ def compile_func(gen: 'Generator', func: Callable, strategy: Strategy, with_hook
             g[call_id] = compiled_func
 
     # register the new function for pickle and unpickle
+    setattr(sys.modules[result.__module__], result.__qualname__, result)
     return result
 
 
@@ -484,12 +461,14 @@ class Generator:
 
 fast_replay_func = fast_replay_args = fast_replay_kwargs = None
 
+import numpy as np
 def fast_replay(trace):
     global fast_replay_func, fast_replay_args, fast_replay_kwargs
     replay_stra = FastReplayStrategy(trace)
     fast_replay_kwargs[_GEN_STRATEGY_VAR] = replay_stra
     try:
-        return fast_replay_func(*fast_replay_args, **fast_replay_kwargs)
+        #aha = fast_replay_func(*fast_replay_args, **fast_replay_kwargs)
+        return np.full((10, 10, 10), 3.14)
     except ExceptionAsContinue:
         return None
 
@@ -580,10 +559,11 @@ class GeneratorExecEnvironment(Iterable):
             self.reset_compilation()
 
         global fast_replay_func, fast_replay_args, fast_replay_kwargs
-#        fast_replay_func = self._compiled_func
-#        fast_replay_args = self.args
-#        fast_replay_kwargs = combined_kwargs
-        exes = [Executor.remote(self._compiled_func, self.args, combined_kwargs) for _ in range(24)]
+        fast_replay_func = self._compiled_func
+        fast_replay_args = self.args
+        fast_replay_kwargs = combined_kwargs
+
+        pool = multiprocessing.Pool()
 
         # main loop
         self.strategy.init()
@@ -593,30 +573,27 @@ class GeneratorExecEnvironment(Iterable):
         t_replay = 0
         while not self.strategy.is_finished() or batch_trace:
             tb = time.time()
+            x = 0
             while len(batch_trace) < self.batch_size and not self.strategy.is_finished():
                 self.strategy.init_run()
                 try:
                     self._compiled_func(*self.args, **combined_kwargs)
                 except ExceptionAsContinue:
                     pass
-                batch_trace.extend(self.strategy.get_trace_batch())
+                t = self.strategy.get_trace_batch()
+                batch_trace.extend(t)
+                x = x * 0.98 + 0.02 * len(t)
                 self.strategy.finish_run()
+
+            #print(x)
 
             te = time.time()
             t_construct += te - tb
 
             # replay traces
-            to_run, batch_trace = batch_trace[:self.batch_size], batch_trace[self.batch_size:]
-
-            time.sleep(5)
-
             tb = time.time()
-            print("Number of tasks: ", len(to_run))
-            #futures = [fast_replay_ray.remote(self._compiled_func, self.args, combined_kwargs, x) for x in to_run]
-
-            futures = [exes[i % 24].execute.remote(x) for i, x in enumerate(to_run)]
-            values = ray.get(futures)
-
+            to_run, batch_trace = batch_trace[:self.batch_size], batch_trace[self.batch_size:]
+            values = [x for x in pool.map(fast_replay, to_run) if x is not None]
             te = time.time()
             t_replay += te - tb
 
@@ -840,7 +817,7 @@ def generator(func=None, strategy='dfs', name=None, group=None, caching=None, me
     def wrapper(func):
         # rename the function for pickle
         func.__qualname__ = func.__qualname__ + "_original"
-        func.__module = func.__module__ or 'atlas.compiled_func'
+        func.__module = func.__module__ or 'atlas.stubs'
         setattr(sys.modules[func.__module__], func.__qualname__, func)
 
         return Generator(func, strategy=strategy, name=name, group=group, caching=caching, metadata=metadata)
