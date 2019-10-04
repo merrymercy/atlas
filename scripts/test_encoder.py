@@ -23,11 +23,10 @@ if __name__ == '__main__':
     encoder = NumpyGraphEncoder()
 
     inputs = [
-        np.array([10, 11])
-        #random_ndarray()
+        np.array([[10, 11], [12, 13]]),
     ]
 
-    output = np.array([[20, 20]])
+    output = np.repeat(inputs[0], axis=1, repeats=3)
 
     val, trace = encoder_tester.generate(inputs, output).with_tracing().first()
     
@@ -45,6 +44,8 @@ if __name__ == '__main__':
         print(f"nodes: {len(nodes)}, edges: {len(edges)}")
 
 
+        # nodes
+        print(f"Domain: {ret['domain']}   Choice: {ret['choice']}")
         node_str = ""
         for i, n_feas in enumerate(nodes):
             converted = []
@@ -57,13 +58,16 @@ if __name__ == '__main__':
             if (i+1) % 4 == 0:
                 node_str += "\n"
         print(node_str)
+        print("")
 
+        # edges
         edge_str = ""
         for i, e_feas in enumerate(edges):
             src, fea, dst = e_feas
-            edge_str += "%-20s" % ("%d->%d %s" % (src, dst, str(EdgeType(fea)).split('.')[1]))
+            edge_str += "%-25s" % ("%d->%d %s" % (src, dst, str(EdgeType(fea)).split('.')[1]))
             if (i+1) % 6 == 0:
                 edge_str += "\n"
         print(edge_str)
+        print("")
 
 

@@ -1,4 +1,5 @@
 import itertools, traceback, warnings, pickle, random, argparse
+
 import numpy as np
 from tqdm import tqdm
 
@@ -64,10 +65,10 @@ if __name__ == "__main__":
         success = 0
         fail = 0
         total_n_trial = 0
-        for inputs, output in tqdm(test_cases):
+        for inputs, output in tqdm(test_cases, ascii=True):
             prog, ct = test_synthesize(inputs, output, max_n_trial=100, 
                                        funcs=funcs, 
-                                       func_seq_replay=infinite_list(['meshgrid']))
+                                       func_seq_replay=infinite_list(['repeat']))
             if prog is not None:
                 success += 1
                 total_n_trial += ct

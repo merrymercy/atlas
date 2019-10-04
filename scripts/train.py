@@ -21,8 +21,8 @@ if __name__ == "__main__":
     train_data, test_data = load_data()
 
     model = NumpyGeneratorModel(model_configs={
-        'Select': {'batch_size': 100000, 'learning_rate': 0.005}
+        'Select': {'batch_size': 100000, 'learning_rate': 0.002}
     })
-    model.train(train_data, test_data, num_epochs=4)
+    model.train(train_data, test_data, num_epochs=-1)
     model.save(args.model_name)
 

@@ -8,8 +8,10 @@ from ...operators import unpack_sid
 class EdgeType(Enum):
     ADJ_UP = auto()
     ADJ_DOWN = auto()
-    EQUALITY = auto()
-    INNER_EQUALITY = auto()
+    ELEM_EQUALITY = auto()     # equality edge for elements in arrays
+    DIM_EQUALITY = auto()      # equality edge for dimension axes in an arrays
+    CROSS_EQUALITY = auto()    # equality edge between elements and dimension axes in arrays
+    SING_VAL_EQUALITY = auto() # equality edge for single value
 
     INDEX = auto()      # from index to cell
     INDEX_FOR = auto()  # from cell to index
@@ -54,12 +56,18 @@ class NodeFeature(Enum):
         else:
             return NodeFeature.OBJECT
 
+class NodeValueType(Enum):
+    ELEM_VALUE = auto()
+    DIM_VALUE = auto()
+    SING_VAL = auto
+
 
 class NumpyGraphEncoder:
     def __init__(self):
-        self.value_collections = dict()
         self.nodes = []
         self.edges = []
+        self.value_collections = dict()
+        self.label_to_node_id = {}
         self.max_dim = 10
 
     def get_num_node_features(self):
@@ -87,15 +95,29 @@ class NumpyGraphEncoder:
         else:
             return []
 
-    def add_equality_edges(self, value, src_node_id, inner_nodes=[]):
+    def add_equality_edges(self, value, src_node_id, src_node_type):
         if value in self.value_collections:
-            for x in self.value_collections[value]:
-                edge_type = EdgeType.INNER_EQUALITY if x in inner_nodes else EdgeType.EQUALITY
-                self.edges.append([x, edge_type.value, src_node_id])
-                self.edges.append([src_node_id, edge_type.value, x])
-            self.value_collections[value].add(src_node_id)
+            for node_id, node_type in self.value_collections[value]:
+                # determine equality type
+                if node_type == src_node_type:
+                    if node_type == NodeValueType.DIM_VALUE:
+                        edge_type = EdgeType.DIM_EQUALITY.value
+                    elif node_type == NodeValueType.ELEM_VALUE:
+                        edge_type = EdgeType.ELEM_EQUALITY.value
+                    else:
+                        edge_type = EdgeType.SING_VAL_EQUALITY.value
+                else:
+                    if (src_node_type == NodeValueType.SING_VAL or 
+                        node_type == NodeValueType.SING_VAL):
+                        edge_type = EdgeType.SING_VAL_EQUALITY.value
+                    else:
+                        edge_type = EdgeType.CROSS_EQUALITY.value
+
+                self.edges.append([node_id, edge_type, src_node_id])
+                self.edges.append([src_node_id, edge_type, node_id])
+            self.value_collections[value].add((src_node_id, src_node_type))
         else:
-            self.value_collections[value] = set([src_node_id])
+            self.value_collections[value] = set([(src_node_id, src_node_type)])
 
     def encode_ndarray(self, array, label):
         base_fea = NumpyGraphEncoder.label_to_base_feature(label)
@@ -109,13 +131,13 @@ class NumpyGraphEncoder:
         t = len(self.nodes) - 1
         self.edges.append([repre_node, EdgeType.ATTR.value, t])
         self.edges.append([t, EdgeType.ATTR_OF.value, repre_node])
-        self.add_equality_edges(array.dtype, t)
+        self.add_equality_edges(array.dtype, t, NodeValueType.ELEM_VALUE)
         if array.size == 0:
-            self.add_equality_edges(-np.inf, t)
-            self.add_equality_edges(np.inf, t)
+            self.add_equality_edges(-np.inf, t, NodeValueType.ELEM_VALUE)
+            self.add_equality_edges(np.inf, t, NodeValueType.ELEM_VALUE)
         else:
-            self.add_equality_edges(np.max(array), t)
-            self.add_equality_edges(np.min(array), t)
+            self.add_equality_edges(np.max(array), t, NodeValueType.ELEM_VALUE)
+            self.add_equality_edges(np.min(array), t, NodeValueType.ELEM_VALUE)
 
         # dim nodes
         dim_nodes = []
@@ -128,7 +150,7 @@ class NumpyGraphEncoder:
                 self.edges.append([repre_node, EdgeType.REPRESENTOR.value, t])
                 self.edges.append([t, EdgeType.REPRESENTED.value, repre_node])
 
-                self.add_equality_edges(i, t)
+                self.add_equality_edges(i, t, NodeValueType.DIM_VALUE)
 
             dim_nodes.append(tmp)
         self.max_dim = max(self.max_dim, array.ndim)
@@ -174,8 +196,7 @@ class NumpyGraphEncoder:
                     self.edges.append([t, EdgeType.ADJ_UP.value, dst])
 
             # equality edge
-            inner_nodes.add(t)
-            self.add_equality_edges(value, t, inner_nodes)
+            self.add_equality_edges(value, t, NodeValueType.ELEM_VALUE)
 
         return repre_node
 
@@ -191,7 +212,7 @@ class NumpyGraphEncoder:
         t = len(self.nodes) - 1
         self.edges.append([repre_node, EdgeType.REPRESENTOR.value, t])
         self.edges.append([t, EdgeType.REPRESENTED.value, repre_node])
-        self.add_equality_edges(value, t)
+        self.add_equality_edges(value, t, NodeValueType.SING_VAL)
 
         return repre_node
 
@@ -246,7 +267,7 @@ def remove_multiple_edges(edges):
         if (edge[0], edge[2]) in visited:
             continue
 
-        visited.add((edge[0], edge[1]))
+        visited.add((edge[0], edge[2]))
         ret.append(edge)
 
     return ret

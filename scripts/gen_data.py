@@ -124,8 +124,8 @@ def gen_traces(seqs, size_per_seq, seq_per_input, funcs, strategy):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--n-only', type=int, default=1)
-    parser.add_argument('--train-size-per-seq', type=int, default=3000)
-    parser.add_argument('--test-size-per-seq', type=int, default=300)
+    parser.add_argument('--train-size-per-seq', type=int, default=10000)
+    parser.add_argument('--test-size-per-seq', type=int, default=1000)
     parser.add_argument('--seq-per-input', type=int, default=20)
 
     args = parser.parse_args()
