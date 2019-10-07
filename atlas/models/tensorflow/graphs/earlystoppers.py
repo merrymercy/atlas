@@ -23,7 +23,7 @@ class EarlyStopper(ABC):
 
 class SimpleEarlyStopper(EarlyStopper):
     def __init__(self, patience: int = 25, val_loss_threshold: float = 0.01,
-                 patience_zero_threshold: Optional[float] = None):
+                 patience_zero_threshold: Optional[float] = 0.999):
         self.best_val_acc: float = -1
         self.best_val_loss: float = -1
         self.wait_cnt = 0
