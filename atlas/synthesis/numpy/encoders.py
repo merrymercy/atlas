@@ -45,14 +45,14 @@ class NodeFeature(Enum):
 
     @staticmethod
     def type_to_feature(value):
-        if value is None or np.isnan(value):
-            return NodeFeature.NAN
-        elif isinstance(value, (np.float64, np.float32, float)):
+        if isinstance(value, (np.float64, np.float32, float)):
             return NodeFeature.FLOAT
         elif isinstance(value, (np.int64, np.int32, int)):
             return NodeFeature.INT
         elif isinstance(value, str):
             return NodeFeature.STR
+        elif value is None:
+            return NodeFeature.NAN
         else:
             return NodeFeature.OBJECT
 
