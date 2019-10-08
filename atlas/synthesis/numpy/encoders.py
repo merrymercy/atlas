@@ -96,6 +96,9 @@ class NumpyGraphEncoder:
             return []
 
     def add_equality_edges(self, value, src_node_id, src_node_type):
+        if isinstance(value, (float, np.float32, np.float64)) and value.is_integer():
+            value = int(value)
+
         if value in self.value_collections:
             for node_id, node_type in self.value_collections[value]:
                 # determine equality type
