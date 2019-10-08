@@ -72,7 +72,7 @@ class IndependentOperatorsModel(TraceImitationModel, ABC):
                                  mode: str = 'training') -> Dict[str, Collection[OpTrace]]:
         file_maps: Dict[str, IndexedFileWriter] = {}
         path_maps: Dict[str, str] = {}
-        for trace in tqdm.tqdm(traces):
+        for trace in tqdm.tqdm(traces, ascii=True):
             for op in trace.op_traces:
                 sid = op.op_info.sid
                 if sid not in file_maps:
