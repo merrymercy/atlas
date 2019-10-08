@@ -569,11 +569,7 @@ def gen_unique(inputs, output, **kwargs):
 def gen_meshgrid(inputs, output, **kwargs):
     c = wrap_io_context(inputs, output)
 
-    #_xs = OrderedSubset([inp for inp in inputs if isinstance(inp, np.ndarray)])
-
-    x1 = Select([inp for inp in inputs if isinstance(inp, np.ndarray)], context=c)
-    x2 = Select([inp for inp in inputs if isinstance(inp, np.ndarray) if inp is not x1], context=c)
-    _xs = (x1, x2)
+    _xs = Sequence([inp for inp in inputs if isinstance(inp, np.ndarray)], lengths=[2])
 
     c = wrap_io_context(_xs, output)
     _indexing = "xy" #Select(["xy", "ij"], context=c)

@@ -11,7 +11,7 @@ numpy_apis =  {gen.name: gen for gen in atlas.utils.get_group_by_name('numpy')}
 
 def gen_sequence(seqs=[]):
     # len = 1
-    return [['repeat']] #, 'dstack', 'reshape']]
+    return [['meshgrid']] #, 'dstack', 'reshape']]
 
     for name in numpy_apis:
         seqs.append([name])
@@ -68,9 +68,9 @@ def random_ndarray(max_dim=4, max_per_dim=4, dtypes=[np.float]):
 
     return np.random.randn(*shape).astype(random.choice(dtypes))
 
-def random_vectors(max_number=4, max_length=5, dtypes=[np.float]):
-    number = np.random.randint(1, max_number)
-    length = np.random.randint(1, max_length)
+def random_vectors(min_number=3, max_number=5, max_length=5, dtypes=[np.float]):
+    number = np.random.randint(min_number, max_number+1)
+    length = np.random.randint(1, max_length+1)
     dtype = np.random.choice(dtypes)
 
     return [np.random.randn(length).astype(dtype) for _ in range(number)]
@@ -93,8 +93,8 @@ def gen_traces(seqs, size_per_seq, seq_per_input, funcs, strategy):
         error_ct = 0
         n_inputs = 0
         while i < size_per_seq and error_ct < MAX_ERROR_RETRY:
-            inputs = [random_ndarray()]
-            #inputs = random_vectors()
+            #inputs = [random_ndarray()]
+            inputs = random_vectors()
 
             ct = 0
             for (output, prog), trace in numpy_sequence_generator.generate(inputs, None, funcs=funcs)\
@@ -114,7 +114,7 @@ def gen_traces(seqs, size_per_seq, seq_per_input, funcs, strategy):
 
         if error_ct >= MAX_ERROR_RETRY:
             print(f"Skip error sequence {seq}")
-        print(f"{seq}: Enumerate space for {n_inputs} inputs, average space size: {i // n_inputs}")
+        print(f"{seq}: Enumerate space for {n_inputs} inputs, average space size: {i / n_inputs:.2f}")
 
     traces = [numpy_sequence_generator.generate(*args).with_replay(trace).with_tracing().first()[1] 
               for trace, args in zip(traces, traces_args)]
