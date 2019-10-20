@@ -59,8 +59,8 @@ def numpy_test(inputs, output):
     val, prog = gen_repeat(inputs, output)
     inputs = inputs + [val]
     val, prog = gen_repeat(inputs, output)
-#    inputs = inputs + [val]
-#    val, prog = gen_repeat(inputs, output)
+    inputs = inputs + [val]
+    val, prog = gen_repeat(inputs, output)
 
     return val, prog
 

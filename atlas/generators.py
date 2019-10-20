@@ -33,7 +33,6 @@ _GEN_COMPILED_TARGET_ID = "_atlas_compiled_function"
 
 import ray
 def fast_replay_ray(fast_replay_func, fast_replay_args, fast_replay_kwargs, trace):
-    #return None
     replay_stra = FastReplayStrategy(trace)
     fast_replay_kwargs[_GEN_STRATEGY_VAR] = replay_stra
     try:
@@ -52,10 +51,7 @@ class Executor:
     def execute(self, trace):
         ret = []
         for item in trace:
-            #continue
             ret.append(fast_replay_ray(self.compiled_func, self.args, self.kwargs, item))
-
-        #ret.append(np.full((5, 5), 0.2))
         return ret
 
 def make_strategy(strategy: Union[str, Strategy]) -> Strategy:
@@ -585,11 +581,18 @@ class GeneratorExecEnvironment(Iterable):
             self.hooks.remove(self.tracer)
             self.reset_compilation()
 
-        global fast_replay_func, fast_replay_args, fast_replay_kwargs
-#        fast_replay_func = self._compiled_func
-#        fast_replay_args = self.args
-#        fast_replay_kwargs = combined_kwargs
-        exes = [Executor.remote(self._compiled_func, self.args, combined_kwargs) for _ in range(24)]
+        use_ray = True
+        batch_size = 2048
+        expand_rate = 1
+
+        if use_ray:
+            exes = [Executor.remote(self._compiled_func, self.args, combined_kwargs) for _ in range(24)]
+        else:
+            global fast_replay_func, fast_replay_args, fast_replay_kwargs
+            fast_replay_func = self._compiled_func
+            fast_replay_args = self.args
+            fast_replay_kwargs = combined_kwargs
+            pool = multiprocessing.Pool()
 
         # main loop
         self.strategy.init()
@@ -614,32 +617,33 @@ class GeneratorExecEnvironment(Iterable):
             # replay traces
             to_run, batch_trace = batch_trace[:self.batch_size], batch_trace[self.batch_size:]
 
-            batch_size = 512
-            expand_rate = 1
-
-            def expand_ndarray(x):
-                for i in range(len(x)):
-                    if isinstance(x[i], np.ndarray):
-                        x[i] = np.repeat(x[i], expand_rate, 0)
-                return x
-
-            for i in range(len(to_run)):
-                to_run[i] = expand_ndarray(to_run[i])
+#            def expand_ndarray(x):
+#                for i in range(len(x)):
+#                    if isinstance(x[i], np.ndarray):
+#                        x[i] = np.repeat(x[i], expand_rate, 0)
+#                return x
+#            for i in range(len(to_run)):
+#                to_run[i] = expand_ndarray(to_run[i])
 
             time.sleep(5)
 
             tb = time.time()
-            to_run = [to_run[x:x+batch_size] for x in range(0, len(to_run), batch_size)]
+            if use_ray:
+                to_run = [to_run[x:x+batch_size] for x in range(0, len(to_run), batch_size)]
 
-            futures = [exes[i % 24].execute.remote(x) for i, x in enumerate(to_run)]
-            values = []
-            for items in ray.get(futures):
-                values.extend(items)
+                futures = [exes[i % 24].execute.remote(x) for i, x in enumerate(to_run)]
+                values = []
+                for items in ray.get(futures):
+                    values.extend(items)
+            else:
+                values = pool.map(fast_replay, to_run)
 
             print("Number of tasks: ", len(values))
 
             te = time.time()
             t_replay += te - tb
+
+            values = [x for x in values if x is not None]
 
             if self.tracer:
                 yield zip(values, to_run)
