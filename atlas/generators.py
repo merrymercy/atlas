@@ -9,7 +9,7 @@ from typing import Callable, Set, Optional, Union, Dict, List, Any, Iterable, It
 
 import astunparse
 
-from atlas.exceptions import ExceptionAsContinue
+from atlas.exceptions import ExceptionAsContinue, StepTermination
 from atlas.hooks import Hook
 from atlas.models import GeneratorModel
 from atlas.operators import OpInfo, OpInfoConstructor
@@ -517,7 +517,43 @@ class GeneratorExecEnvironment(Iterable):
             finally:
                 self.strategy.finish_run()
 
+    def beam_iter(self) -> Iterator:
+        combined_kwargs = {**self.kwargs,
+                           _GEN_EXEC_ENV_VAR: self, _GEN_STRATEGY_VAR: self.strategy,
+                           _GEN_HOOK_VAR: []}
+
+        real_stra = self.strategy.backup_strategy if isinstance(self.strategy, 
+                PartialReplayStrategy) else self.strategy
+
+        self.strategy.init()
+        beam = [([], 1)]   # List of tuple(choice list, prob)
+        while len(beam) > 0:
+            next_beam = []
+            for trace, prob in beam:
+                try:
+                    real_stra.reset_trace(trace)
+                    self.strategy.init_run()
+                    result = self._compiled_func(*self.args, **combined_kwargs)
+                    self.strategy.finish_run()
+                    yield result
+                    real_stra.iter_ct += 1
+                    if real_stra.max_iter and real_stra.iter_ct > real_stra.max_iter:
+                        return
+                except StepTermination as e:
+                    for step_choice, step_prob in zip(e.choices, e.probs):
+                        next_beam.append((trace + [step_choice], prob * step_prob))
+                except ExceptionAsContinue:
+                    continue
+
+            beam = sorted(next_beam, key=lambda x: -x[1])[:real_stra.beam_size]
+
     def __iter__(self) -> Iterator:
+        real_stra = self.strategy.backup_strategy if isinstance(self.strategy, 
+                PartialReplayStrategy) else self.strategy
+        if "Beam" in str(real_stra):
+            yield from self.beam_iter()
+            return
+
         extra_kwargs = {_GEN_EXEC_ENV_VAR: self, _GEN_STRATEGY_VAR: self.strategy, _GEN_HOOK_VAR: self.hooks}
 
         for h in self.hooks:
