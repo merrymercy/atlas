@@ -633,9 +633,12 @@ def gen_take(inputs, output, **kwargs):
     # todo(lmzheng): fix the case when indices is an input array. See also unravel_index
     _axis = Select([None] + list(range(_a.ndim)), context=c)
 
-    indices_domain = [x for x in inputs if (isinstance(x, np.ndarray) and "int" in str(x.dtype)) 
-                                           or "int" in str(type(x))]
-    indices_domain.extend(range(_a.shape[_axis]))
+    max_len = _a.size if _axis is None else _a.shape[_axis]
+    indices_domain = [x for x in inputs if ((isinstance(x, np.ndarray) and "int" in str(x.dtype)) 
+                                           or "int" in str(type(x))) and np.max(x) < max_len]
+    if _axis is not None:
+        indices_domain.extend(range(_a.shape[_axis]))
+
     _indices = Select(indices_domain, context=c)
 
     prog = {"a": _a, "axis": _axis, "indices": _indices}
@@ -737,7 +740,9 @@ def gen_argsort(inputs, output, **kwargs):
     _a = SelectExternal(inputs, dtype=np.ndarray, **kwargs)
 
     c = {"I0": _a, "O": output}
-    _axis = Select([None] + list(range(_a.ndim)), context=c)
+    #  todo(lmzheng): fix this? disabled None to avoid array explosion
+    #_axis = Select([None] + list(range(_a.ndim)), context=c) 
+    _axis = Select(range(_a.ndim), context=c)
 
     prog = {"a": _a, "axis": _axis}
     return np.argsort(**prog), prog

@@ -47,16 +47,19 @@ def numpy_sequence_generator(inputs, output, funcs=[], max_seq_len=3):
     if isinstance(val, np.ndarray):
         return val, prog
     elif isinstance(val, (tuple, list)): 
-        # for functions that return tuples of array (e.g. meshgrid)
-        try:
+        if (all(isinstance(x, np.ndarray) for x in val) and 
+            all(x.shape == val[0].shape for x in val)):
+            # for functions that return tuples of array (e.g. meshgrid)
             return np.array(val), prog
-        except ValueError:
+        else:
             # only return np.ndarray.
             # This is a limitation of our encoder, which only supports np.ndarray
             # and does not support tuple of np.ndarray
             for x in val:
                 if isinstance(x, np.ndarray):
                     return x, prog
+        # list of int, object
+        return np.array(val), prog
     else:
         return val, prog
 
