@@ -102,7 +102,7 @@ class IndependentOperatorsModel(TraceImitationModel, SerializableModel, OpResolv
         if self.USE_DISK:
             file_maps: Dict[str, IndexedFileWriter] = {}
             path_maps: Dict[str, str] = {}
-            for trace in tqdm.tqdm(traces):
+            for trace in tqdm.tqdm(traces, ascii=True):
                 for op in trace.op_traces:
                     op_info = op.op_info
                     if op_info not in file_maps:
@@ -120,7 +120,7 @@ class IndependentOperatorsModel(TraceImitationModel, SerializableModel, OpResolv
 
         else:
             data: Dict[OpInfo, List[OpTrace]] = collections.defaultdict(list)
-            for trace in tqdm.tqdm(traces):
+            for trace in tqdm.tqdm(traces, ascii=True):
                 for op in trace.op_traces:
                     data[op.op_info].append(op)
 

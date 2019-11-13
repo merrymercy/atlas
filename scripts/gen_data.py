@@ -159,74 +159,74 @@ def gen_sequence(seqs=[]):
     return [
         #TestSequence(['unique'], lambda : random_ndarrays_with_duplicate()),
         TestSequence(['meshgrid'], lambda : random_vectors(number=5)),
-        #TestSequence(['dstack'], lambda : random_vectors(same_length=True)),
-        #TestSequence(['reshape'], lambda : random_ndarrays()),
-        #TestSequence(['ndarray.__sub__'], lambda : random_vectors(same_length=True)),
-        #TestSequence(['linalg.norm'], lambda : random_ndarrays()),
-        ##TestSequence(['matmul'], lambda : random_ndarrays_for_matmul()),
-        ##TestSequence(['sum'], lambda : random_ndarrays()),
-        #TestSequence(['isnan'], lambda : random_vectors_with_nan()),
-        #TestSequence(['logical_not'], lambda : random_ndarrays()),
-        #TestSequence(['compress'], lambda : random_vectors_with_a_bool_array()),
-
-        #TestSequence(['ndarray.__div__'], lambda : random_vectors(same_length=True)),
-        #TestSequence(['swapaxes'], lambda : random_ndarrays(min_dim=2)),
-        ## Todo(lmzheng): fix this later
-        ##TestSequence(['unravel_index'], lambda : random_index_and_shape()),
-        #TestSequence(['argsort'], lambda : random_ndarrays()),
-        #TestSequence(['flip'], lambda : random_ndarrays()),
-        #TestSequence(['ndarray.__getitem__'], lambda : random_ndarrays()),
-        #TestSequence(['take'], lambda : random_ndarrays()),
-        #TestSequence(['zeros'], lambda : []),
-        #TestSequence(['hstack'], lambda : random_ndarrays_for_hstack()),
-        #TestSequence(['transpose'], lambda : random_ndarrays()),
-
-        ## No. 3
-        #TestSequence(['unique'], lambda : random_ndarrays_with_duplicate()),
-        ## No. 4
-        #TestSequence(['meshgrid', 'dstack', 'reshape'], lambda : random_vectors()),
-        ## No. 6
-        #TestSequence(['ndarray.__sub__', 'linalg.norm'], lambda : random_vectors(same_length=True)),
-        ## No. 8
+        TestSequence(['dstack'], lambda : random_vectors(same_length=True)),
+        TestSequence(['reshape'], lambda : random_ndarrays()),
+        TestSequence(['ndarray.__sub__'], lambda : random_vectors(same_length=True)),
+        TestSequence(['linalg.norm'], lambda : random_ndarrays()),
         #TestSequence(['matmul'], lambda : random_ndarrays_for_matmul()),
-        ## No. 9
         #TestSequence(['sum'], lambda : random_ndarrays()),
-        ## No. 10
-        #TestSequence(['isnan', 'logical_not', 'compress'], lambda: random_vectors_with_nan()),
-        ## No. 12
-        #TestSequence(['linalg.norm', 'ndarray.__div__'], lambda : random_ndarrays()),
-        ## No. 13
-        #TestSequence(['ndarray.flatten'], lambda : random_ndarrays()),
-        ## No. 14
-        #TestSequence(['vstack'], lambda : random_vectors(same_length=True)),
-        ## No. 15
-        #TestSequence(['reshape', 'swapaxes'], lambda : random_ndarrays()),
-        ## No. 16
-        #TestSequence(['argmax', 'unravel_index'], lambda : random_ndarrays()),
-        ## No. 17
-        #TestSequence(['vstack', 'reshape'], lambda : random_vectors(same_length=True)),
-        ## No. 21
-        #TestSequence(['argsort', 'flip', 'ndarray.__getitem__'], lambda : random_vectors(1)),
-        ## No. 22
-        #TestSequence(['take', 'argsort', 'take'], lambda : random_ndarrays()),
-        ## No. 25
-        #TestSequence(['reshape', 'swapaxes', 'reshape'], lambda: random_ndarrays()),
-        ## No. 26  hard to generate testcases
-        #TestSequence(['zeros', 'hstack'], lambda: random_ndarrays()),
-        ## No. 29
-        #TestSequence(['unique', 'vstack', 'transpose'], lambda: random_vectors(1)),
-        ## No. 32   duplication of No.13
-        ## No. 33   duplication of No.14
-        ### No. 34  hard to generate testcases
-        ##TestSequence(['repeat', 'reshape', 'hstack'], lambda: random_ndarrays_with_scalar()),
-        ## No. 35
-        #TestSequence(['delete'], lambda: random_vectors_with_index()),
-        ## No. 36
-        #TestSequence(['argmax'], lambda: random_ndarrays()),
-        ## No. 38
-        #TestSequence(['searchsorted'], lambda: random_vectors_with_subvector(1)),
-        ## No. 39
-        #TestSequence(['minimum'], lambda: random_ndarrays_with_scalar()),
+        TestSequence(['isnan'], lambda : random_vectors_with_nan()),
+        TestSequence(['logical_not'], lambda : random_ndarrays()),
+        TestSequence(['compress'], lambda : random_vectors_with_a_bool_array()),
+
+        TestSequence(['ndarray.__div__'], lambda : random_vectors(same_length=True)),
+        TestSequence(['swapaxes'], lambda : random_ndarrays(min_dim=2)),
+        # Todo(lmzheng): fix this later
+        #TestSequence(['unravel_index'], lambda : random_index_and_shape()),
+        TestSequence(['argsort'], lambda : random_ndarrays()),
+        TestSequence(['flip'], lambda : random_ndarrays()),
+        TestSequence(['ndarray.__getitem__'], lambda : random_ndarrays()),
+        TestSequence(['take'], lambda : random_ndarrays()),
+        TestSequence(['zeros'], lambda : []),
+        TestSequence(['hstack'], lambda : random_ndarrays_for_hstack()),
+        TestSequence(['transpose'], lambda : random_ndarrays()),
+
+        # No. 3
+        TestSequence(['unique'], lambda : random_ndarrays_with_duplicate()),
+        # No. 4
+        TestSequence(['meshgrid', 'dstack', 'reshape'], lambda : random_vectors()),
+        # No. 6
+        TestSequence(['ndarray.__sub__', 'linalg.norm'], lambda : random_vectors(same_length=True)),
+        # No. 8
+        TestSequence(['matmul'], lambda : random_ndarrays_for_matmul()),
+        # No. 9
+        TestSequence(['sum'], lambda : random_ndarrays()),
+        # No. 10
+        TestSequence(['isnan', 'logical_not', 'compress'], lambda: random_vectors_with_nan()),
+        # No. 12
+        TestSequence(['linalg.norm', 'ndarray.__div__'], lambda : random_ndarrays()),
+        # No. 13
+        TestSequence(['ndarray.flatten'], lambda : random_ndarrays()),
+        # No. 14
+        TestSequence(['vstack'], lambda : random_vectors(same_length=True)),
+        # No. 15
+        TestSequence(['reshape', 'swapaxes'], lambda : random_ndarrays()),
+        # No. 16
+        TestSequence(['argmax', 'unravel_index'], lambda : random_ndarrays()),
+        # No. 17
+        TestSequence(['vstack', 'reshape'], lambda : random_vectors(same_length=True)),
+        # No. 21
+        TestSequence(['argsort', 'flip', 'ndarray.__getitem__'], lambda : random_vectors(1)),
+        # No. 22
+        TestSequence(['take', 'argsort', 'take'], lambda : random_ndarrays()),
+        # No. 25
+        TestSequence(['reshape', 'swapaxes', 'reshape'], lambda: random_ndarrays()),
+        # No. 26  hard to generate testcases
+        TestSequence(['zeros', 'hstack'], lambda: random_ndarrays()),
+        # No. 29
+        TestSequence(['unique', 'vstack', 'transpose'], lambda: random_vectors(1)),
+        # No. 32   duplication of No.13
+        # No. 33   duplication of No.14
+        ## No. 34  hard to generate testcases
+        #TestSequence(['repeat', 'reshape', 'hstack'], lambda: random_ndarrays_with_scalar()),
+        # No. 35
+        TestSequence(['delete'], lambda: random_vectors_with_index()),
+        # No. 36
+        TestSequence(['argmax'], lambda: random_ndarrays()),
+        # No. 38
+        TestSequence(['searchsorted'], lambda: random_vectors_with_subvector(1)),
+        # No. 39
+        TestSequence(['minimum'], lambda: random_ndarrays_with_scalar()),
     ]
 
 def gen_sequence_cheat(seqs=[]):
