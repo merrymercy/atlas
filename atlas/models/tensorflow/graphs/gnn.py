@@ -6,6 +6,8 @@ from atlas.models.tensorflow.graphs.earlystoppers import EarlyStopper
 
 
 class GNN(TensorflowModel, ABC):
+    MAX_BATCH_DENSITY = 1/500
+
     def __init__(self, params: Mapping[str, Any]):
         super().__init__()
         self.params = params
@@ -16,14 +18,24 @@ class GNN(TensorflowModel, ABC):
     def get_batch_iterator(self, graph_iter: Iterator[Dict],
                            batch_size: int, is_training: bool = True) -> Iterator[Dict]:
 
-        node_offset = 0
+        node_ct = 0
+        edge_ct = 0
         cur_batch = []
         for g in graph_iter:
-            cur_batch.append(g)
-            node_offset += len(g['nodes'])
-            if node_offset > batch_size > 0:
+            # Do not accept graphs that are too large or too dense.
+            # Otherwise we will get Out Of Memory.
+            if edge_ct + len(g['edges']) <= batch_size * batch_size * self.MAX_BATCH_DENSITY:
+                cur_batch.append(g)
+                node_ct += len(g['nodes'])
+                edge_ct += len(g['edges'])
+            else:
+                print(f"Dropped a graph that is too large: "
+                      f"#nodes: {len(g['nodes'])}, #edges: {len(g['edges'])}               ")
+
+            if node_ct > batch_size > 0:
                 yield len(cur_batch), self.define_batch(cur_batch, is_training)
-                node_offset = 0
+                node_ct = 0
+                edge_ct = 0
                 cur_batch = []
 
         if len(cur_batch) > 0:

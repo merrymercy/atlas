@@ -7,6 +7,8 @@ import atlas
 from atlas.synthesis.numpy import NumpyGeneratorModel
 from atlas.models.tensorflow.graphs.earlystoppers import SimpleEarlyStopper
 
+from gen_data import gen_sequence, get_used_functions
+
 def train_seq_only(sid):
     if sid == '/numpy_sequence_generator/SequenceFixed@func_seq@1':
         return False
@@ -83,4 +85,49 @@ if __name__ == "__main__":
                               early_stopper=early_stopper,
                               skip_sid=skip_sid)
     model.save(args.model_name)
+
+
+'''
+    from atlas.synthesis.numpy.encoders import NumpyGraphEncoder
+    from atlas.synthesis.utils import dump_encodings
+    seqs = gen_sequence()
+    funcs = get_used_functions(seqs)
+
+    for x, dataset in train_datasets.items():
+        encoded_train = dump_encodings(dataset, NumpyGraphEncoder().get_encoder(x))
+        max_n_nodes, max_n_edges = 0, 0
+        average_n_nodes, average_n_edges = None, None
+        for i, (g, trace) in enumerate(zip(encoded_train, dataset)):
+            updated = False
+            if len(g['nodes']) > max_n_nodes:
+                max_n_nodes = len(g['nodes'])
+                updated = True
+            if len(g['edges']) > max_n_edges:
+                max_n_edges = len(g['edges'])
+                updated = True
+
+            if average_n_nodes is None:
+                average_n_nodes = len(g['nodes'])
+            else:
+                average_n_nodes = 0.95 * average_n_nodes + 0.05 * len(g['nodes'])
+
+            if average_n_edges is None:
+                average_n_edges = len(g['edges'])
+            else:
+                average_n_edges = 0.95 * average_n_edges + 0.05 * len(g['edges'])
+
+            if updated:
+                print("Max updated", max_n_nodes, max_n_edges,
+                      [funcs[idx] for idx in g['choice'][:-1]])
+
+            n_n = len(g['nodes'])
+            n_e = len(g['edges'])
+            if n_e > n_n * n_n / 2 / 2:
+                print("!Too Dense", n_n, n_e,
+                      [funcs[idx] for idx in g['choice'][:-1]])
+
+#            if i % 1000 == 0:
+#                print("Average", average_n_nodes, average_n_edges)
+        exit()
+'''
 
