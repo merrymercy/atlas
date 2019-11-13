@@ -246,12 +246,11 @@ def gen_sequence_cheat(seqs=[]):
 
 def get_used_functions(seqs):
     used_funcs = set()
-    ret = []
     for funcs, _ in seqs:
         for func in funcs:
-            if func not in used_funcs:
-                used_funcs.add(func)
-                ret.append(func)
+            used_funcs.add(func)
+    ret = list(used_funcs)
+    ret.sort()
     return ret
 
 
