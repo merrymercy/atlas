@@ -117,8 +117,11 @@ class NumpyGraphEncoder:
                     if (src_node_type == NodeValueType.SING_VAL or 
                         node_type == NodeValueType.SING_VAL):
                         edge_type = EdgeType.SING_VAL_EQUALITY.value
-                    else:
-                        edge_type = EdgeType.CROSS_EQUALITY.value
+                    else: 
+                        continue
+                        # Don't add edges for now to avoid OOM  
+                        # todo(lmzheng): think about a better method
+                        #edge_type = EdgeType.CROSS_EQUALITY.value
 
                 self.edges.append([node_id, edge_type, src_node_id])
                 self.edges.append([src_node_id, edge_type, node_id])

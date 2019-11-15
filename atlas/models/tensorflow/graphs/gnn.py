@@ -20,6 +20,7 @@ class GNN(TensorflowModel, ABC):
 
         node_ct = 0
         edge_ct = 0
+        drop_ct = 0
         cur_batch = []
         for g in graph_iter:
             # Do not accept graphs that are too large or too dense.
@@ -28,9 +29,14 @@ class GNN(TensorflowModel, ABC):
                 cur_batch.append(g)
                 node_ct += len(g['nodes'])
                 edge_ct += len(g['edges'])
+                drop_ct = 0
             else:
                 print(f"Dropped a graph that is too large: "
                       f"#nodes: {len(g['nodes'])}, #edges: {len(g['edges'])}               ")
+                drop_ct += 1
+
+            if drop_ct >= 10:
+                exit()
 
             if node_ct > batch_size > 0:
                 yield len(cur_batch), self.define_batch(cur_batch, is_training)
