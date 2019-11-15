@@ -25,17 +25,17 @@ def dump_encodings(data: Collection[OpTrace], encode_func: Callable, path: str =
     path = path or "data.encoded"
 
     global_encode_func = encode_func
-    pool = multiprocessing.Pool()
+    #pool = multiprocessing.Pool()
 
     def patch_func(func, data):
         ret = []
         for x in data:
             ret.append(func(x))
         return ret
-    pool.map = patch_func
+    #pool.map = patch_func
 
-    encoded_graphs = pool.map(encode_op, data)
-    del pool
+    encoded_graphs = patch_func(encode_op, data)
+    #del pool
 
     encoding_file = IndexedFileWriter(path)
     for graph in encoded_graphs:
