@@ -31,14 +31,11 @@ class GNN(TensorflowModel, ABC):
                 edge_ct += len(g['edges'])
                 drop_ct = 0
             else:
-                print(f"Dropped a graph that is too large: "
-                      f"#nodes: {len(g['nodes'])}, #edges: {len(g['edges'])}               ")
                 drop_ct += 1
+                print(f"Dropped a graph that is too large: "
+                      f"#nodes: {len(g['nodes'])}, #edges: {len(g['edges'])}, drop ct: {drop_ct}, node_ct: {node_ct}, edge_ct: {edge_ct}, batch_size: {batch_size}")
 
-            if drop_ct >= 10:
-                exit()
-
-            if node_ct > batch_size > 0:
+            if node_ct > batch_size > 0 or drop_ct >= 5:
                 yield len(cur_batch), self.define_batch(cur_batch, is_training)
                 node_ct = 0
                 edge_ct = 0
