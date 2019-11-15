@@ -32,7 +32,7 @@ def dump_encodings(data: Collection[OpTrace], encode_func: Callable, path: str =
         for x in data:
             ret.append(func(x))
         return ret
-    #pool.map = patch_func
+    pool.map = patch_func
 
     encoded_graphs = pool.map(encode_op, data)
     del pool

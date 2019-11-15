@@ -150,7 +150,7 @@ def func(inputs):
 def func(inputs):
     a = inputs[0]
     b = np.argmax(a)
-    c = np.unravel_index(a.argmax(), a.shape)
+    c = np.unravel_index(b, a.shape)
     return c
 
 @register_case(no=17,
