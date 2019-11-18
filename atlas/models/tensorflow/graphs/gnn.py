@@ -6,7 +6,7 @@ from atlas.models.tensorflow.graphs.earlystoppers import EarlyStopper
 
 
 class GNN(TensorflowModel, ABC):
-    MAX_BATCH_DENSITY = 1/1000
+    MAX_BATCH_DENSITY = 1/200
 
     def __init__(self, params: Mapping[str, Any]):
         super().__init__()

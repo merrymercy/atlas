@@ -71,20 +71,20 @@ class IndependentOperatorsModel(TraceImitationModel, SerializableModel, OpResolv
                             early_stopper: EarlyStopper = None,
                             **kwargs):
         tbegin = datetime.datetime.now()
-        for op_info, dataset in train_datasets.items():
+        for i, (op_info, dataset) in enumerate(train_datasets.items()):
             if skip_sid and skip_sid(op_info.sid):
                 print(f"Skip {op_info.sid}")
                 continue
 
             if op_info in self.model_map:
-                print(f"[+] Training the existing model for {op_info.sid}")
+                print(f"[+] {i}/{len(train_datasets)} Training the existing model for {op_info.sid}")
                 model = self.model_map[op_info]
                 model_dir = self.model_paths[op_info]
             else:
                 model: TrainableSerializableModel = self.get_op_model(op_info, dataset)
                 if model is None:
                     continue
-                print(f"[+] Training a new model for {op_info.sid}")
+                print(f"[+] {i}/{len(train_datasets)} Training a new model for {op_info.sid}")
                 model_dir = f"{self.work_dir}/models/{op_info.sid}"
                 os.makedirs(model_dir, exist_ok=True)
                 self.model_map[op_info] = model
